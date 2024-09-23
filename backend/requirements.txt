@@ -1,0 +1,15 @@
+aiohttp==3.10.5
+anthropic==0.18.1
+beautifulsoup4==4.12.3
+boto3==1.35.15
+fastapi==0.95.2
+httpx==0.25.2
+nodeenv==1.9.1
+numpy==2.1.1
+openai==1.44.1
+pillow==10.4.0
+pre-commit==3.8.0
+python-dotenv==1.0.1
+types-Pillow==10.2.0.20240822
+uvicorn==0.25.0
+websockets==12.0

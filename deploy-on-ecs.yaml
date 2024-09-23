@@ -1,0 +1,592 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Demo of deploy screenshot to code on ECS.
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: screenshot-to-code-demo
+    Description: "A friendly environment name that will be used for namespacing all cluster resources. Example: staging, qa, or production"
+  MinContainersScreenshotToCode:
+    Type: Number
+    Default: 2
+    Description: "Minimum number of ECS tasks per ECS service"
+  MaxContainersScreenshotToCode:
+    Type: Number
+    Default: 10
+    Description: "Maximum number of ECS tasks per ECS service"
+  AutoScalingTargetValueScreenshotToCode:
+    Type: Number
+    Default: 50
+    Description: "Target CPU utilizatio (%) for ECS services auto scaling"
+
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups: 
+      - 
+        Label: 
+          default: "Generic"
+        Parameters: 
+          - EnvironmentName
+          - PrivateDNSNamespaceName
+
+Mappings:
+  SubnetConfig:
+    VPC:
+      CIDR: '10.0.0.0/16'
+    PublicOne:
+      CIDR: '10.0.0.0/24'
+    PublicTwo:
+      CIDR: '10.0.1.0/24'
+    PublicThree:
+      CIDR: '10.0.2.0/24'
+    PrivateOne:
+      CIDR: '10.0.100.0/24'
+    PrivateTwo:
+      CIDR: '10.0.101.0/24'
+    PrivateThree:
+      CIDR: '10.0.102.0/24'
+
+Resources:
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !FindInMap ['SubnetConfig', 'VPC', 'CIDR']
+
+  PublicSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicOne', 'CIDR']
+      MapPublicIpOnLaunch: true
+  PublicSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicTwo', 'CIDR']
+      MapPublicIpOnLaunch: true
+  PublicSubnetThree:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 2
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicThree', 'CIDR']
+      MapPublicIpOnLaunch: true
+
+  PrivateSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 0
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateOne', 'CIDR']
+  PrivateSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 1
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateTwo', 'CIDR']
+  PrivateSubnetThree:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Select
+        - 2
+        - Fn::GetAZs: !Ref 'AWS::Region'
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateThree', 'CIDR']
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  GatewayAttachement:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref 'VPC'
+      InternetGatewayId: !Ref 'InternetGateway'
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Properties:
+      RouteTableId: !Ref 'PublicRouteTable'
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref 'InternetGateway'
+  PublicSubnetOneRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetOne
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetTwoRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetTwo
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetThreeRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetThree
+      RouteTableId: !Ref PublicRouteTable
+
+  NatGatewayOneAttachment:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachement
+    Properties:
+        Domain: vpc
+  NatGatewayOne:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayOneAttachment.AllocationId
+      SubnetId: !Ref PublicSubnetOne
+  PrivateRouteTableOne:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+  PrivateRouteOne:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableOne
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayOne
+  PrivateRouteTableOneAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableOne
+      SubnetId: !Ref PrivateSubnetOne
+  PrivateRouteTableTwo:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+  PrivateRouteTwo:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableTwo
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayOne
+  PrivateRouteTableTwoAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableTwo
+      SubnetId: !Ref PrivateSubnetTwo
+  PrivateRouteTableThree:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+  PrivateRouteThree:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableThree
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayOne
+  PrivateRouteTableThreeAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableThree
+      SubnetId: !Ref PrivateSubnetThree
+
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      RouteTableIds:
+        - !Ref PrivateRouteTableOne
+        - !Ref PrivateRouteTableTwo
+        - !Ref PrivateRouteTableThree
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcId: !Ref 'VPC'
+      VpcEndpointType: Gateway
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: 's3:*'
+            Resource: '*'
+
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'screenshot-to-code-${AWS::AccountId}'
+      AccessControl: Private
+
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the application load balancer
+      VpcId: !Ref 'VPC'
+
+  LoadBalancerSecurityGroupHttpIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref LoadBalancerSecurityGroup
+      CidrIp: 0.0.0.0/0
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+
+  FrontendContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the Frontend
+      VpcId: !Ref 'VPC'
+
+  FrontendContainerSecurityGroupSelfIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref FrontendContainerSecurityGroup
+      SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+
+  BackendContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the Backend
+      VpcId: !Ref 'VPC'
+  
+  BackendContainerSecurityGroupSelfIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref BackendContainerSecurityGroup
+      SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+      IpProtocol: tcp
+      FromPort: 7001
+      ToPort: 7001
+
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole'
+
+  ECSRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ecs.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: ecs-service
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - 'ec2:AttachNetworkInterface'
+              - 'ec2:CreateNetworkInterface'
+              - 'ec2:CreateNetworkInterfacePermission'
+              - 'ec2:DeleteNetworkInterface'
+              - 'ec2:DeleteNetworkInterfacePermission'
+              - 'ec2:Describe*'
+              - 'ec2:DetachNetworkInterface'
+
+              - 'elasticloadbalancing:DeregisterInstancesFromLoadBalancer'
+              - 'elasticloadbalancing:DeregisterTargets'
+              - 'elasticloadbalancing:Describe*'
+              - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer'
+              - 'elasticloadbalancing:RegisterTargets'
+            Resource: '*'
+
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ecs-tasks.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: AmazonECSTaskExecutionRolePolicy
+          PolicyDocument:
+            Statement:
+            - Effect: Allow
+              Action:
+                # Allow the ECS Tasks to download images from ECR
+                - 'ecr:GetAuthorizationToken'
+                - 'ecr:BatchCheckLayerAvailability'
+                - 'ecr:GetDownloadUrlForLayer'
+                - 'ecr:BatchGetImage'
+
+                # Allow the ECS tasks to upload logs to CloudWatch
+                - 'logs:CreateLogStream'
+                - 'logs:PutLogEvents'
+              Resource: '*'
+
+  TaskRoleBackend:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+      - PolicyName: bedrock-and-s3-access
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - bedrock:*
+            Resource: '*'
+          - Effect: Allow
+            Action:
+            - s3:*
+            Resource: '*'
+
+  TaskDefinitionFrontend:
+    Type: 'AWS::ECS::TaskDefinition'
+    Properties:
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        OperatingSystemFamily: LINUX
+        # CpuArchitecture: X86_64
+      ContainerDefinitions:
+          - Name: 'Frontend'
+            Image: '<your-account-id>.dkr.ecr.<your-region>.amazonaws.com/screenshot-to-code-frontend:latest'
+            Essential: true
+            PortMappings:
+              - ContainerPort: 80
+                Protocol: tcp
+      NetworkMode: awsvpc
+      Memory: '2048'
+      Cpu: '1024'
+  
+  TaskDefinitionBackend:
+    Type: 'AWS::ECS::TaskDefinition'
+    DependsOn:
+      - S3Bucket
+    Properties:
+      TaskRoleArn: !GetAtt TaskRoleBackend.Arn
+      ExecutionRoleArn: !GetAtt ECSTaskExecutionRole.Arn
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        OperatingSystemFamily: LINUX
+        # CpuArchitecture: X86_64
+      ContainerDefinitions:
+          - Name: 'Backend'
+            Image: '<your-account-id>.dkr.ecr.<your-region>.amazonaws.com/screenshot-to-code-backend:latest'
+            Essential: true
+            PortMappings:
+              - ContainerPort: 7001
+                Protocol: tcp
+            Environment:
+              - Name: 'IMAGE_OUPUT_S3_BUCKET'
+                Value: !Ref S3Bucket
+              - Name: 'DEPLOY_ON_AWS'
+                Value: 'True'
+      NetworkMode: awsvpc
+      Memory: '2048'
+      Cpu: '1024'
+
+  TargetGroupFrontend:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 3
+      HealthCheckPath: /
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: '200'
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref 'VPC'
+  
+  TargetGroupBackend:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 3
+      HealthCheckPath: /
+      UnhealthyThresholdCount: 3
+      Matcher:
+        HttpCode: '200'
+      Port: 7001
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !Ref 'VPC'
+  
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Ref EnvironmentName
+      Scheme: internet-facing
+      Subnets:
+        - !Ref PublicSubnetOne
+        - !Ref PublicSubnetTwo
+        - !Ref PublicSubnetThree
+      SecurityGroups:
+        - !Ref LoadBalancerSecurityGroup
+      Type: application
+  
+  ApplicationListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref 'TargetGroupFrontend'
+  
+  ApplicationListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref 'TargetGroupBackend'
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /static/*
+            - /generate-code
+            - api/screenshot
+      ListenerArn: !Ref ApplicationListener
+      Priority: 1
+
+  ServiceFrontend: 
+    Type: AWS::ECS::Service
+    DependsOn:
+      - ApplicationLoadBalancer
+      - ApplicationListener
+      - TargetGroupFrontend
+      - PrivateRouteOne
+      - PrivateRouteTwo
+      - PrivateRouteThree
+    Properties: 
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref TaskDefinitionFrontend
+      LaunchType: FARGATE
+      DesiredCount: 2
+      NetworkConfiguration:
+          AwsvpcConfiguration:
+            AssignPublicIp: DISABLED
+            Subnets:
+              - !Ref PrivateSubnetOne
+              - !Ref PrivateSubnetTwo
+              - !Ref PrivateSubnetThree
+            SecurityGroups:
+              - !Ref FrontendContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: 'Frontend'
+          ContainerPort: 80
+          TargetGroupArn: !Ref 'TargetGroupFrontend'
+  
+  ServiceBackend:
+    Type: AWS::ECS::Service
+    DependsOn:
+      - ApplicationLoadBalancer
+      - ApplicationListener
+      - TargetGroupBackend
+      - ApplicationListenerRule
+      - PrivateRouteOne
+      - PrivateRouteTwo
+      - PrivateRouteThree
+    Properties: 
+      Cluster: !Ref ECSCluster
+      TaskDefinition: !Ref TaskDefinitionBackend
+      LaunchType: FARGATE
+      DesiredCount: 2
+      NetworkConfiguration:
+          AwsvpcConfiguration:
+            AssignPublicIp: DISABLED
+            Subnets:
+              - !Ref PrivateSubnetOne
+              - !Ref PrivateSubnetTwo
+              - !Ref PrivateSubnetThree
+            SecurityGroups:
+              - !Ref BackendContainerSecurityGroup
+      LoadBalancers:
+        - ContainerName: 'Backend'
+          ContainerPort: 7001
+          TargetGroupArn: !Ref 'TargetGroupBackend'
+
+  AutoScalingTargetFrontend:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: !Ref MinContainersScreenshotToCode
+      MaxCapacity: !Ref MaxContainersScreenshotToCode
+      ResourceId: !Join ['/', [service, !Ref ECSCluster, !GetAtt ServiceFrontend.Name]]
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      RoleARN: !GetAtt AutoScalingRole.Arn
+
+  AutoScalingTargetBackend:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MinCapacity: !Ref MinContainersScreenshotToCode
+      MaxCapacity: !Ref MaxContainersScreenshotToCode
+      ResourceId: !Join ['/', [service, !Ref ECSCluster, !GetAtt ServiceBackend.Name]]
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
+      RoleARN: !GetAtt AutoScalingRole.Arn
+
+  AutoScalingPolicyFrontend:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Join ['', [!GetAtt ServiceFrontend.Name, '-AutoScalingPolicy']]
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTargetFrontend
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: !Ref AutoScalingTargetValueScreenshotToCode
+  
+  AutoScalingPolicyBackend:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Join ['', [!GetAtt ServiceBackend.Name, '-AutoScalingPolicy']]
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AutoScalingTargetBackend
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: !Ref AutoScalingTargetValueScreenshotToCode
+
+Outputs:
+  ECSClusterName:
+    Description: The name of the ECS cluster
+    Value: !Ref 'ECSCluster'
+  VpcId:
+    Description: The ID of the VPC that this stack is deployed in
+    Value: !Ref 'VPC'
+  LoadBalancerDNS:
+    Description: The DNS name of the load balancer
+    Value: !GetAtt 'ApplicationLoadBalancer.DNSName'
