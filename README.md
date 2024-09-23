@@ -1,23 +1,21 @@
-# screenshot-to-code
+# screenshot-to-code-use-bedrock
 
-A simple tool to convert screenshots, mockups and Figma designs into clean, functional code using Bedrock.
+<div align="center">
 
-Supported stacks:
+<h1 align="center">screenshot-to-code-use-bedrock</h1>
 
-- HTML + CSS
-- HTML + Tailwind
-- React + Tailwind
-- Vue + Tailwind
-- Bootstrap
-- Ionic + Tailwind
-- SVG
+It is a screenshot-to-code forked from https://github.com/abi/screenshot-to-code
 
-Supported AI models:
+And it was simplified to support AWS Bedrock only.
 
-- Claude 3.5 Sonnet - Best model!
-- Claude 3 Opus
-- Claude 3 Sonnet
-- Claude 3 Haiku
+</div>
+
+## Important Notice:
+```
+This project is a sample project intended solely to showcase the process of building a screenshot-to-code that connects to models like Claude3 and Titan on Bedrock. 
+
+It is not a production-ready client, and it should not be used in a production environment without further development and testing.
+```
 
 ## deploy on docker-composer
 
