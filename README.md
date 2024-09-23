@@ -41,8 +41,10 @@ Note: You can remove the '--build' without changing anything
 
 - Run the following commands to set the relevant ACCOUNT_ID and AWS_REGION.
 
+```linux
 export ACCOUNT_ID=$(aws sts get-caller-identity --output text --query Account)
 export AWS_REGION=<your-region-name>
+```
 
 - Run the following commands to create the relevant image repository.
 
@@ -98,4 +100,41 @@ aws cloudformation create-stack \
 aws cloudformation wait stack-create-complete \
   --stack-name screenshot-to-code-stack \
   --region ${AWS_REGION}
+```
+
+- Run the following commands to view the access link.
+
+```linux
+aws cloudformation describe-stacks \
+  --region ${AWS_REGION} \
+  --query "Stacks[?StackName=='screenshot-to-code-stack'][].Outputs[?OutputKey=='LoadBalancerDNS'].OutputValue" \
+  --output text
+```
+
+- Clean up the environment: Empty the S3 bucket used to store the generated images.
+
+```linux
+aws s3 rm s3://screenshot-to-code-${ACCOUNT_ID}/ --recursive --region ${AWS_REGION}
+```
+
+- Clean up the environment: Delete the created Stack.
+
+```linux
+aws cloudformation delete-stack \
+  --stack-name screenshot-to-code-stack \
+  --region ${AWS_REGION}
+```
+
+- Clean up the environment: Delete the image.
+
+```linux
+aws ecr delete-repository \
+  --repository-name screenshot-to-code-frontend \
+  --region ${AWS_REGION} \
+  --force
+
+aws ecr delete-repository \
+  --repository-name screenshot-to-code-backend \
+  --region ${AWS_REGION} \
+  --force
 ```
