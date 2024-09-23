@@ -246,7 +246,7 @@ async def stream_code(websocket: WebSocket):
                 # Depending on the presence and absence of various keys,
                 # we decide which models to run
                 variant_models = ["bedrock"]
-                if bedrock_region == "":
+                if bedrock_region == "" or bedrock_region is None:
                     bedrock_region = "us-west-2"
                 if not DEPLOY_ON_AWS:
                     if bedrock_access_key == "" or bedrock_secret_key == "":
