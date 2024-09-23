@@ -2,7 +2,7 @@ aiohttp==3.10.5
 anthropic==0.18.1
 beautifulsoup4==4.12.3
 boto3==1.35.15
-fastapi==0.95.2
+fastapi==0.109.1
 httpx==0.25.2
 nodeenv==1.9.1
 numpy==2.1.1
