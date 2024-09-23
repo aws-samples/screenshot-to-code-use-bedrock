@@ -88,7 +88,7 @@ sed -i "s/<your-account-id>/${ACCOUNT_ID}/g" template.yaml
 sed -i "s/<your-region>/${AWS_REGION}/g" template.yaml
 ```
 
-- Run the following commands to create an ECS-based deployment.
+- Run the following commands to create an ECS-based deployment, Creation time approximately 6 minutes.
 
 ```linux
 aws cloudformation create-stack \
