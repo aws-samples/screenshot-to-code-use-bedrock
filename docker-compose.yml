@@ -14,7 +14,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    env_file:
-      - .env
+      args:
+        - VITE_WS_BACKEND_URL=${VITE_WS_BACKEND_URL}
+        - VITE_HTTP_BACKEND_URL=${VITE_HTTP_BACKEND_URL}
     ports:
       - "80:80"
