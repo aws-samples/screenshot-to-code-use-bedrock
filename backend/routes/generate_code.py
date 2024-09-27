@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import dataclass
 from fastapi import APIRouter, WebSocket
 from fastapi.websockets import WebSocketState
-import openai
+import time
 from codegen.utils import extract_html_content
 from config import (
     BEDROCK_ACCESS_KEY,
@@ -254,7 +254,6 @@ async def stream_code(websocket: WebSocket):
                             "No Bedrock Access permissions. Please add the environment variable BEDROCK_ACCESS_KEY and BEDROCK_SECRET_KEY to backend/.env or in the settings dialog. If you add it to .env, make sure to restart the backend server."
                         )
                         raise Exception("No Bedrock Access permissions")
-
                 tasks: List[Coroutine[Any, Any, str]] = []
                 for index, model in enumerate(variant_models):
                     if model == "bedrock":
@@ -285,7 +284,7 @@ async def stream_code(websocket: WebSocket):
     completions = [extract_html_content(completion) for completion in completions]
 
     # Write the messages dict into a log so that we can debug later
-    write_logs(prompt_messages, completions[0])
+    # write_logs(prompt_messages, completions[0])
 
     # Keep the websocket alive
     async def keep_alive(websocket: WebSocket):
@@ -324,5 +323,4 @@ async def stream_code(websocket: WebSocket):
             await keep_alive_task
         except asyncio.CancelledError:
             pass
-        
         await websocket.close()

@@ -18,3 +18,4 @@ frontend/.env.local
 # tmp files
 tmp.txt
 typings
+template.yaml

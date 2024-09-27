@@ -1,6 +1,7 @@
 import copy
 import boto3
 import json
+import asyncio
 from enum import Enum
 from typing import Any, Awaitable, Callable, List, cast
 from anthropic import AsyncAnthropic
@@ -183,12 +184,10 @@ async def stream_claude_bedrock_response(
         "messages": claude_messages,
     })
 
-    response = bedrock_runtime.invoke_model_with_response_stream(
-        body=body,
+    response = await asyncio.to_thread(bedrock_runtime.invoke_model_with_response_stream, body=body,
         modelId=model.value,
         accept="application/json",
-        contentType="application/json",
-    )
+        contentType="application/json")
 
     content = ""
     for event in response.get('body'):
@@ -204,6 +203,8 @@ async def stream_claude_bedrock_response(
                 await callback(f"""\n******\nStop reason: {chunk_str['delta']['stop_reason']}; Stop sequence: {chunk_str['delta']['stop_sequence']}; Output tokens: {chunk_str['usage']['output_tokens']}""")
         elif chunk_str['type'] == "error":
             print("Error")
+
+        await asyncio.sleep(0)
 
     return content
     
