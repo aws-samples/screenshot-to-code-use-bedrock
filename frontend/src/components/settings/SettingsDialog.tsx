@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog";
+} from "../ui/dialog";
 import { FaCog } from "react-icons/fa";
 import { EditorTheme, Settings } from "../../types";
 import { Switch } from "../ui/switch";
@@ -21,6 +21,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "../ui/accordion";
+import ImageModelSettingsSection from "./ImageModelSettingsSection";
 
 interface Props {
   settings: Settings;
@@ -45,25 +46,38 @@ function SettingsDialog({ settings, setSettings }: Props) {
           <DialogTitle className="mb-4">Settings</DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-center space-x-2">
-          <Label htmlFor="image-generation">
-            <div>Image Generation</div>
-            <div className="font-light mt-2 text-xs">
-              More fun with it but if you want to save money, turn it off.
-            </div>
-          </Label>
-          <Switch
-            id="image-generation"
-            checked={settings.isImageGenerationEnabled}
-            onCheckedChange={() =>
-              setSettings((s) => ({
-                ...s,
-                isImageGenerationEnabled: !s.isImageGenerationEnabled,
-              }))
-            }
-          />
-        </div>
         <div className="flex flex-col space-y-6">
+          <div className="flex items-center space-x-2">
+            <Label htmlFor="image-generation">
+              <div>Image Generation</div>
+              <div className="font-light mt-2 text-xs">
+                More fun with it but if you want to save money, turn it off.
+              </div>
+            </Label>
+            <Switch
+              id="image-generation"
+              checked={settings.isImageGenerationEnabled}
+              onCheckedChange={() =>
+                setSettings((s) => ({
+                  ...s,
+                  isImageGenerationEnabled: !s.isImageGenerationEnabled,
+                }))
+              }
+            />
+          </div>
+
+          {settings.isImageGenerationEnabled && (
+            <ImageModelSettingsSection
+              imageGenerationModel={settings.imageGenerationModel}
+              setImageGenerationModel={(model) =>
+                setSettings((s) => ({
+                  ...s,
+                  imageGenerationModel: model,
+                }))
+              }
+            />
+          )}
+
           <div>
             <Label htmlFor="bedrock-access-key">
               <div>Bedrock access key</div>
@@ -197,7 +211,7 @@ function SettingsDialog({ settings, setSettings }: Props) {
                     </div>
                   </Label>
                   <div>
-                    <Select // Use the custom Select component here
+                    <Select
                       name="editor-theme"
                       value={settings.editorTheme}
                       onValueChange={(value) =>

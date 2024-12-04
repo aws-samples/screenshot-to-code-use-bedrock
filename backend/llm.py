@@ -20,6 +20,7 @@ class Llm(Enum):
     CLAUDE_3_OPUS = "anthropic.claude-3-opus-20240229-v1:0"
     CLAUDE_3_HAIKU = "anthropic.claude-3-haiku-20240307-v1:0"
     CLAUDE_3_5_SONNET_2024_06_20 = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+    CLAUDE_3_5_SONNET_2024_10_22 = "anthropic.claude-3-5-sonnet-20241022-v2:0"
     
 # Will throw errors if you send a garbage string
 def convert_frontend_str_to_llm(frontend_str: str) -> Llm:

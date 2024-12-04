@@ -1,5 +1,5 @@
 import { Stack } from "./lib/stacks";
-import { CodeGenerationModel } from "./lib/models";
+import { CodeGenerationModel, ImageGenerationModel } from "./lib/models";
 
 export enum EditorTheme {
   ESPRESSO = "espresso",
@@ -9,6 +9,7 @@ export enum EditorTheme {
 export interface Settings {
   screenshotOneApiKey: string | null;
   isImageGenerationEnabled: boolean;
+  imageGenerationModel: ImageGenerationModel;
   editorTheme: EditorTheme;
   generatedCodeConfig: Stack;
   codeGenerationModel: CodeGenerationModel;

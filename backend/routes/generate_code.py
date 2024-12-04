@@ -34,11 +34,6 @@ router = APIRouter()
 
 # Auto-upgrade usage of older models
 def auto_upgrade_model(code_generation_model: Llm) -> Llm:
-    #if code_generation_model == Llm.CLAUDE_3_SONNET:
-    #    print(
-    #        f"Initial deprecated model: {code_generation_model}. Auto-updating code generation model to CLAUDE-3.5-SONNET-2024-06-20"
-    #    )
-    #    return Llm.CLAUDE_3_5_SONNET_2024_06_20
     return code_generation_model
 
 
@@ -50,11 +45,14 @@ async def perform_image_generation(
     bedrock_secret_key: str | None,
     bedrock_region: str | None,
     image_cache: dict[str, str],
+    image_generation_model: Literal["amazon.titan-image-generator-v1:0", "amazon.titan-image-generator-v2:0", "amazon.nova-canvas-v1:0"] = "amazon.nova-canvas-v1:0",
 ):
     if not should_generate_images:
         return completion
 
-    image_generation_model = "amazon.titan-image-generator-v2:0"
+    print(f'Generating images use {image_generation_model}...')
+    if image_generation_model == "amazon.nova-canvas-v1:0":
+        bedrock_region = "us-east-1"
 
     return await generate_images(
         completion,
@@ -75,6 +73,7 @@ class ExtractedParams:
     bedrock_access_key: str | None
     bedrock_secret_key: str | None
     bedrock_region: str | None
+    image_generation_model: Literal["amazon.titan-image-generator-v1:0", "amazon.titan-image-generator-v2:0", "amazon.nova-canvas-v1:0"]
 
 
 async def extract_params(
@@ -119,6 +118,12 @@ async def extract_params(
     # Get the image generation flag from the request. Fall back to True if not provided.
     should_generate_images = bool(params.get("isImageGenerationEnabled", True))
 
+    # Get the image generation model from the request. Fall back to nova-canvas if not provided.
+    image_generation_model = params.get("imageGenerationModel", "amazon.nova-canvas-v1:0")
+    if image_generation_model not in ["amazon.titan-image-generator-v1:0", "amazon.titan-image-generator-v2:0", "amazon.nova-canvas-v1:0"]:
+        await throw_error(f"Invalid image generation model: {image_generation_model}")
+        raise ValueError(f"Invalid image generation model: {image_generation_model}")
+
     return ExtractedParams(
         stack=validated_stack,
         input_mode=validated_input_mode,
@@ -127,6 +132,7 @@ async def extract_params(
         bedrock_access_key=bedrock_access_key,
         bedrock_secret_key=bedrock_secret_key,
         bedrock_region=bedrock_region,
+        image_generation_model=cast(Literal["amazon.titan-image-generator-v1:0", "amazon.titan-image-generator-v2:0", "amazon.nova-canvas-v1:0"], image_generation_model),
     )
 
 
@@ -187,12 +193,10 @@ async def stream_code(websocket: WebSocket):
     bedrock_secret_key = extracted_params.bedrock_secret_key
     bedrock_region = extracted_params.bedrock_region
     should_generate_images = extracted_params.should_generate_images
-
-    # Auto-upgrade usage of older models
-    # code_generation_model = auto_upgrade_model(code_generation_model)
+    image_generation_model = extracted_params.image_generation_model
 
     print(
-        f"Generating {stack} code in {input_mode} mode using {code_generation_model}..."
+        f"Generating {stack} code in {input_mode} mode using {code_generation_model} should gen iamges {should_generate_images} use model {image_generation_model}..."
     )
 
     for i in range(NUM_VARIANTS):
@@ -211,8 +215,6 @@ async def stream_code(websocket: WebSocket):
         )
         raise
 
-    # pprint_prompt(prompt_messages)  # type: ignore
-
     ### Code generation
 
     async def process_chunk(content: str, variantIndex: int):
@@ -225,24 +227,7 @@ async def stream_code(websocket: WebSocket):
         try:
             if input_mode == "video":
                 print("Video mode")
-                #if not anthropic_api_key:
-                #    await throw_error(
-                #        "Video only works with Anthropic models. No Anthropic API key found. Please add the environment variable ANTHROPIC_API_KEY to backend/.env or in the settings #dialog"
-                #    )
-                #    raise Exception("No Anthropic key")
-#
-                #completions = [
-                #    await stream_claude_response_native(
-                #        system_prompt=VIDEO_PROMPT,
-                #        messages=prompt_messages,  # type: ignore
-                #        api_key=anthropic_api_key,
-                #        callback=lambda x: process_chunk(x, 0),
-                #        model=Llm.CLAUDE_3_OPUS,
-                #        include_thinking=True,
-                #    )
-                #]
             else:
-
                 # Depending on the presence and absence of various keys,
                 # we decide which models to run
                 variant_models = ["bedrock"]
@@ -269,7 +254,7 @@ async def stream_code(websocket: WebSocket):
                         )
 
                 completions = await asyncio.gather(*tasks)
-                print("Models used for generation: ", variant_models)
+                print("Models used for generation: ", variant_models, code_generation_model)
                 
         except Exception as e:
             print("[GENERATE_CODE] An error occurred", e)
@@ -282,9 +267,6 @@ async def stream_code(websocket: WebSocket):
 
     # Strip the completion of everything except the HTML content
     completions = [extract_html_content(completion) for completion in completions]
-
-    # Write the messages dict into a log so that we can debug later
-    # write_logs(prompt_messages, completions[0])
 
     # Keep the websocket alive
     async def keep_alive(websocket: WebSocket):
@@ -305,6 +287,7 @@ async def stream_code(websocket: WebSocket):
                 bedrock_secret_key,
                 bedrock_region,
                 image_cache,
+                image_generation_model,
             )
             for completion in completions
         ]

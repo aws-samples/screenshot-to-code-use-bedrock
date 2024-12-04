@@ -21,13 +21,13 @@ async def process_tasks(
     bedrock_access_key: str | None,
     bedrock_secret_key: str | None,
     bedrock_region: str | None,
-    model: Literal["amazon.titan-image-generator-v1:0", "amazon.titan-image-generator-v2:0"],
+    model: Literal["amazon.titan-image-generator-v1:0", "amazon.titan-image-generator-v2:0", "amazon.nova-canvas-v1:0"],
 ):
     import time
 
     start_time = time.time()
 
-    tasks = [generate_image(prompt, bedrock_access_key, bedrock_secret_key, bedrock_region) for prompt in prompts]
+    tasks = [generate_image(prompt, bedrock_access_key, bedrock_secret_key, bedrock_region, model) for prompt in prompts]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     end_time = time.time()
     generation_time = end_time - start_time
@@ -44,7 +44,7 @@ async def process_tasks(
 
 
 async def generate_image(
-    prompt: str, bedrock_access_key: str | None, bedrock_secret_key: str | None, bedrock_region: str | None, model: Literal["amazon.titan-image-generator-v1:0", "amazon.titan-image-generator-v2:0"] = "amazon.titan-image-generator-v2:0",
+    prompt: str, bedrock_access_key: str | None, bedrock_secret_key: str | None, bedrock_region: str | None, model: Literal["amazon.titan-image-generator-v1:0", "amazon.titan-image-generator-v2:0", "amazon.nova-canvas-v1:0"] = "amazon.nova-canvas-v1:0",
 ) -> Union[str, None]:
     client = boto3.client(service_name="bedrock-runtime", region_name=bedrock_region, aws_access_key_id=bedrock_access_key, aws_secret_access_key=bedrock_secret_key) # type: ignore
     
@@ -71,7 +71,7 @@ async def generate_image(
         return s3_key_presigned_url(IMAGE_OUPUT_S3_BUCKET, f'{request_hash}.png')
 
     async def generate_image_replicate(model: str, request: str) -> str:
-        print(f'generate image with promt: {prompt}')
+        print(f'generate image with model {model} promt: {prompt}')
         response = await asyncio.to_thread(client.invoke_model, modelId=model, body=request) # type: ignore
         return response # type: ignore
     
@@ -177,8 +177,9 @@ async def generate_images(
     bedrock_secret_key: str | None,
     bedrock_region: str | None,
     image_cache: Dict[str, str],
-    model: Literal["amazon.titan-image-generator-v1:0", "amazon.titan-image-generator-v2:0"] = "amazon.titan-image-generator-v2:0",
+    model: Literal["amazon.titan-image-generator-v1:0", "amazon.titan-image-generator-v2:0", "amazon.nova-canvas-v1:0"] = "amazon.nova-canvas-v1:0",
 ) -> str:
+    print(f"Generating images use {model}...")
     # Find all images
     soup = BeautifulSoup(code, "html.parser")
     images = soup.find_all("img")

@@ -7,7 +7,7 @@ import { USER_CLOSE_WEB_SOCKET_CODE } from "./constants";
 import { extractHistory } from "./components/history/utils";
 import toast from "react-hot-toast";
 import { Stack } from "./lib/stacks";
-import { CodeGenerationModel } from "./lib/models";
+import { CodeGenerationModel, ImageGenerationModel } from "./lib/models";
 import useBrowserTabIndicator from "./hooks/useBrowserTabIndicator";
 import TipLink from "./components/messages/TipLink";
 import { useAppStore } from "./store/app-store";
@@ -63,6 +63,7 @@ function App() {
       bedrockRegion: null,
       screenshotOneApiKey: null,
       isImageGenerationEnabled: true,
+      imageGenerationModel: ImageGenerationModel.NOVA_CANVAS,
       editorTheme: EditorTheme.COBALT,
       generatedCodeConfig: Stack.HTML_CSS,
       codeGenerationModel: CodeGenerationModel.CLAUDE_3_5_SONNET_2024_06_20,
@@ -80,6 +81,7 @@ function App() {
 
   const showBetterModelMessage =
     model !== CodeGenerationModel.CLAUDE_3_5_SONNET_2024_06_20 &&
+    model !== CodeGenerationModel.CLAUDE_3_5_SONNET_2024_10_22 &&
     model !== CodeGenerationModel.CLAUDE_3_OPUS_2024_02_29 &&
     model !== CodeGenerationModel.CLAUDE_3_SONNET_2024_02_29 &&
     model !== CodeGenerationModel.CLAUDE_3_HAIKU_2024_03_07 &&
@@ -87,6 +89,7 @@ function App() {
 
   const showSelectAndEditFeature =
     (model === CodeGenerationModel.CLAUDE_3_5_SONNET_2024_06_20 ||
+      model === CodeGenerationModel.CLAUDE_3_5_SONNET_2024_10_22 ||
       model === CodeGenerationModel.CLAUDE_3_OPUS_2024_02_29 || 
       model === CodeGenerationModel.CLAUDE_3_SONNET_2024_02_29 ||
       model === CodeGenerationModel.CLAUDE_3_HAIKU_2024_03_07) &&
@@ -106,7 +109,13 @@ function App() {
         generatedCodeConfig: Stack.HTML_TAILWIND,
       }));
     }
-  }, [settings.generatedCodeConfig, setSettings]);
+    if (!settings.imageGenerationModel) {
+      setSettings((prev) => ({
+        ...prev,
+        imageGenerationModel: ImageGenerationModel.NOVA_CANVAS,
+      }));
+    }
+  }, [settings.generatedCodeConfig, settings.imageGenerationModel, setSettings]);
 
   // Functions
   const reset = () => {
