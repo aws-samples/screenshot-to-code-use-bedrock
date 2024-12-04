@@ -176,39 +176,56 @@ async def stream_claude_bedrock_response(
                     "data": base64_data,
                 }
 
-    # Stream Bedrock Claude response
-    body = json.dumps({
-        "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-        "system": system_prompt,
-        "messages": claude_messages,
-    })
+    async def make_bedrock_call(messages_to_send):
+        body = json.dumps({
+            "anthropic_version": "bedrock-2023-05-31",
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "system": system_prompt,
+            "messages": messages_to_send,
+        })
 
-    response = await asyncio.to_thread(bedrock_runtime.invoke_model_with_response_stream, body=body,
-        modelId=model.value,
-        accept="application/json",
-        contentType="application/json")
+        response = await asyncio.to_thread(bedrock_runtime.invoke_model_with_response_stream, body=body,
+            modelId=model.value,
+            accept="application/json",
+            contentType="application/json")
 
-    content = ""
-    for event in response.get('body'):
-        chunk_str = json.loads(event['chunk']['bytes'].decode('utf-8'))
-
-        if chunk_str['type'] == "message_start":
-            print("Message start")
-        elif chunk_str['type'] == "content_block_delta":
-            if chunk_str['delta']['type'] == 'text_delta':
-                content += chunk_str['delta']['text']
-                await callback(chunk_str['delta']['text'])
+        content = ""
+        stop_reason = None
+        for event in response.get('body'):
+            chunk_str = json.loads(event['chunk']['bytes'].decode('utf-8'))
+            if chunk_str['type'] == "message_start":
+                print("Message start")
+            elif chunk_str['type'] == "content_block_delta":
+                if chunk_str['delta']['type'] == 'text_delta':
+                    content += chunk_str['delta']['text']
+                    await callback(chunk_str['delta']['text'])
             elif chunk_str['type'] == "message_delta":
-                await callback(f"""\n******\nStop reason: {chunk_str['delta']['stop_reason']}; Stop sequence: {chunk_str['delta']['stop_sequence']}; Output tokens: {chunk_str['usage']['output_tokens']}""")
-        elif chunk_str['type'] == "error":
-            print("Error")
+                stop_reason = chunk_str['delta']['stop_reason']
+                print(f"""\n******\nStop reason: {stop_reason}; Stop sequence: {chunk_str['delta']['stop_sequence']}; Output tokens: {chunk_str['usage']['output_tokens']}""")
+            elif chunk_str['type'] == "error":
+                print("Error")
 
-        await asyncio.sleep(0)
+            await asyncio.sleep(0)
+
+        return content.strip(), stop_reason
+
+    # Initial call
+    content, stop_reason = await make_bedrock_call(claude_messages)
+    
+    # Handle max_tokens case by adding a user message requesting continuation
+    while stop_reason == "max_tokens":
+        claude_messages_tmp = copy.deepcopy(claude_messages)
+        # Add the previous response as an assistant message
+        claude_messages_tmp.append({"role": "assistant", "content": content.strip()})
+        
+        # Make another call
+        additional_content, stop_reason = await make_bedrock_call(claude_messages_tmp)
+        
+        # Update content
+        content += additional_content
 
     return content
-    
 
 async def stream_claude_response_native(
     system_prompt: str,
