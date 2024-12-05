@@ -85,6 +85,8 @@ function App() {
     model !== CodeGenerationModel.CLAUDE_3_OPUS_2024_02_29 &&
     model !== CodeGenerationModel.CLAUDE_3_SONNET_2024_02_29 &&
     model !== CodeGenerationModel.CLAUDE_3_HAIKU_2024_03_07 &&
+    model !== CodeGenerationModel.NOVA_LITE &&
+    model !== CodeGenerationModel.NOVA_PRO &&
     appState === AppState.INITIAL;
 
   const showSelectAndEditFeature =
@@ -92,7 +94,9 @@ function App() {
       model === CodeGenerationModel.CLAUDE_3_5_SONNET_2024_10_22 ||
       model === CodeGenerationModel.CLAUDE_3_OPUS_2024_02_29 || 
       model === CodeGenerationModel.CLAUDE_3_SONNET_2024_02_29 ||
-      model === CodeGenerationModel.CLAUDE_3_HAIKU_2024_03_07) &&
+      model === CodeGenerationModel.CLAUDE_3_HAIKU_2024_03_07 ||
+      model === CodeGenerationModel.NOVA_LITE ||
+      model === CodeGenerationModel.NOVA_PRO) &&
     (settings.generatedCodeConfig === Stack.HTML_TAILWIND ||
       settings.generatedCodeConfig === Stack.HTML_CSS);
 

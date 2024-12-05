@@ -22,6 +22,8 @@ class Llm(Enum):
     CLAUDE_3_HAIKU = "anthropic.claude-3-haiku-20240307-v1:0"
     CLAUDE_3_5_SONNET_2024_06_20 = "anthropic.claude-3-5-sonnet-20240620-v1:0"
     CLAUDE_3_5_SONNET_2024_10_22 = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+    NOVA_LITE = "amazon.nova-lite-v1:0"
+    NOVA_PRO = "amazon.nova-pro-v1:0"
     
 # Will throw errors if you send a garbage string
 def convert_frontend_str_to_llm(frontend_str: str) -> Llm:
@@ -144,7 +146,7 @@ async def stream_claude_bedrock_response(
     bedrock_runtime = boto3.client(service_name="bedrock-runtime", region_name=region, aws_access_key_id=access_key, aws_secret_access_key=secret_key)
 
     # Base parameters
-    max_tokens = 128
+    max_tokens = 4096
     temperature = 0.0
 
     # Deep copy messages to avoid modifying the original list
