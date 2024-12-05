@@ -2,6 +2,7 @@ import copy
 import boto3
 import json
 import asyncio
+import base64
 from enum import Enum
 from typing import Any, Awaitable, Callable, List, cast
 from anthropic import AsyncAnthropic
@@ -143,7 +144,7 @@ async def stream_claude_bedrock_response(
     bedrock_runtime = boto3.client(service_name="bedrock-runtime", region_name=region, aws_access_key_id=access_key, aws_secret_access_key=secret_key)
 
     # Base parameters
-    max_tokens = 4096
+    max_tokens = 128
     temperature = 0.0
 
     # Deep copy messages to avoid modifying the original list
@@ -151,60 +152,64 @@ async def stream_claude_bedrock_response(
 
     system_prompt = cast(str, cloned_messages[0].get("content"))
     claude_messages = [dict(message) for message in cloned_messages[1:]]
-    for message in claude_messages:
-        if not isinstance(message["content"], list):
-            continue
-
-        for content in message["content"]:  # type: ignore
-            if content["type"] == "image_url":
-                content["type"] = "image"
-
-                # Extract base64 data and media type from data URL
-                # Example base64 data URL: data:image/png;base64,iVBOR...
-                image_data_url = cast(str, content["image_url"]["url"])
-
-                # Process image and split media type and data
-                # so it works with Claude (under 5mb in base64 encoding)
-                (media_type, base64_data) = process_image(image_data_url)
-
-                # Remove OpenAI parameter
-                del content["image_url"]
-
-                content["source"] = {
-                    "type": "base64",
-                    "media_type": media_type,
-                    "data": base64_data,
-                }
 
     async def make_bedrock_call(messages_to_send):
-        body = json.dumps({
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "system": system_prompt,
-            "messages": messages_to_send,
-        })
+        # Convert messages to the format expected by converse_stream
+        formatted_messages = []
+        for msg in messages_to_send:
+            if isinstance(msg["content"], str):
+                formatted_message = {
+                    "role": msg["role"],
+                    "content": [{"text": msg["content"]}]
+                }
+            else:
+                # Handle image content
+                formatted_content = []
+                for content_item in msg["content"]:
+                    if content_item.get("type") == "image_url":
+                        # Process image data
+                        image_data_url = cast(str, content_item["image_url"]["url"])
+                        media_type, base64_data = process_image(image_data_url)
+                        media_type = media_type.split("/")[1]
+                        formatted_content.append({
+                            "image": {
+                                "format": media_type,
+                                "source": {
+                                    "bytes": base64_data
+                                }
+                            }
+                        })
+                    else:
+                        # Handle text content
+                        formatted_content.append({"text": content_item.get("text", "")})
+                
+                formatted_message = {
+                    "role": msg["role"],
+                    "content": formatted_content
+                }
+            formatted_messages.append(formatted_message)
 
-        response = await asyncio.to_thread(bedrock_runtime.invoke_model_with_response_stream, body=body,
+        response = await asyncio.to_thread(
+            bedrock_runtime.converse_stream,
             modelId=model.value,
-            accept="application/json",
-            contentType="application/json")
+            messages=formatted_messages,
+            inferenceConfig={
+                "maxTokens": max_tokens,
+                "temperature": temperature
+            },
+            system=[{"text": system_prompt}]
+        )
 
         content = ""
         stop_reason = None
-        for event in response.get('body'):
-            chunk_str = json.loads(event['chunk']['bytes'].decode('utf-8'))
-            if chunk_str['type'] == "message_start":
-                print("Message start")
-            elif chunk_str['type'] == "content_block_delta":
-                if chunk_str['delta']['type'] == 'text_delta':
-                    content += chunk_str['delta']['text']
-                    await callback(chunk_str['delta']['text'])
-            elif chunk_str['type'] == "message_delta":
-                stop_reason = chunk_str['delta']['stop_reason']
-                print(f"""\n******\nStop reason: {stop_reason}; Stop sequence: {chunk_str['delta']['stop_sequence']}; Output tokens: {chunk_str['usage']['output_tokens']}""")
-            elif chunk_str['type'] == "error":
-                print("Error")
+        for event in response.get('stream'):
+            print(event)
+            if "contentBlockDelta" in event:
+                text = event["contentBlockDelta"]["delta"]["text"]
+                content += text
+                await callback(text)
+            elif "messageStop" in event:
+                stop_reason = event["messageStop"]["stopReason"]
 
             await asyncio.sleep(0)
 

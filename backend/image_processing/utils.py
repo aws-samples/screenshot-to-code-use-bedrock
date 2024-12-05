@@ -22,13 +22,6 @@ def process_image(image_data_url: str) -> tuple[str, str]:
         img.width < CLAUDE_MAX_IMAGE_DIMENSION
         and img.height < CLAUDE_MAX_IMAGE_DIMENSION
     )
-    is_under_size_limit = len(base64_data) <= CLAUDE_IMAGE_MAX_SIZE
-
-    # If image is under both limits, no processing needed
-    if is_under_dimension_limit and is_under_size_limit:
-        print("[CLAUDE IMAGE PROCESSING] no processing needed")
-        return (media_type, base64_data)
-
     # Time image processing
     start_time = time.time()
 
@@ -77,4 +70,4 @@ def process_image(image_data_url: str) -> tuple[str, str]:
     processing_time = end_time - start_time
     print(f"[CLAUDE IMAGE PROCESSING] processing time: {processing_time:.2f} seconds")
 
-    return ("image/jpeg", base64.b64encode(output.getvalue()).decode("utf-8"))
+    return ("image/jpeg", output.getvalue())
