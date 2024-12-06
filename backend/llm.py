@@ -205,7 +205,6 @@ async def stream_claude_bedrock_response(
         content = ""
         stop_reason = None
         for event in response.get('stream'):
-            print(event)
             if "contentBlockDelta" in event:
                 text = event["contentBlockDelta"]["delta"]["text"]
                 content += text
